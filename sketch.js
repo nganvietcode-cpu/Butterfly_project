@@ -1,88 +1,132 @@
-
+let table;
+let butterflyData = [];
 let particles = [];
-
+let currentIndex = 0;
 let colors = [
-  [255, 105, 180],  // Pink
-  [255, 0, 255],    // Bright pink
-  [0, 255, 255],    // Tiffany blue
-  [255, 51, 153],   // Rose pink
-  [255, 255, 255]   // White
+  [255, 105, 180],  // pink
+  [255, 0, 255],    // bright pink
+  [0, 255, 255],    // tiffany blue
+  [255, 51, 153],   // rose pink
+  [255, 255, 255]   // white
 ];
 
-let centerX = 400;
-let centerY = 300;
-let radius = 220;
-
-function setup() {
+// Map the data
+async function setup() {
   createCanvas(800, 600);
 
-  for (let i = 0; i < 200; i++) {
-    particles.push(new Particle());
+  table = await loadTable('resource.csv', ',', 'header');
+
+  for (let row of table.getRows()) {
+    let selectedYear = row.getNum('Year');
+    let count = row.getNum('Count');
+
+    butterflyData.push({
+      year: selectedYear,
+      count: count
+    });
+  }
+
+  print(butterflyData);
+
+  for (let i = 0; i < 800; i++) {
+    let pos = randomButterflyPoint(600);
+    particles.push(new Particle(pos.x, pos.y));
   }
 }
 
 function draw() {
   background(20);
 
-  noFill();
-  stroke(255, 100);
-  strokeWeight(1);
-  circle(centerX, centerY, radius * 2);
+  if (butterflyData.length === 0) {
+    return;
+  }
 
-  for (let particle of particles) {
-    particle.update();
-    particle.show();
+  let currentData = butterflyData[currentIndex];
+
+  let particleCount = round(
+    map(currentData.count, 0, 101, 0, 800)
+  );
+
+  for (let i = 0; i < particleCount; i++) {
+    particles[i].update();
+    particles[i].show();
+  }
+
+  noStroke();
+  fill(255);
+  textAlign(CENTER);
+  textSize(20);
+
+  text("Year: " + currentData.year, width / 2, 35);
+  text("Records: " + currentData.count, width / 2, 60);
+
+  // Change year every 1.5 seconds
+  if (frameCount % 90 === 0) {
+    currentIndex++;
+
+    if (currentIndex >= butterflyData.length) {
+      currentIndex = 0;
+    }
   }
 }
 
 class Particle {
-  constructor() {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+
+    this.homeX = x;
+    this.homeY = y;
+
     this.angle = random(TWO_PI);
-    this.distance = radius * sqrt(random());
+    this.speed = random(0.001, 0.003);
+    this.moveAmount = random(0.5, 1.5);
 
-    this.x = centerX + cos(this.angle) * this.distance;
-    this.y = centerY + sin(this.angle) * this.distance;
-
-    this.vx = random(-0.5, 0.5);
-    this.vy = random(-0.5, 0.5);
-
-    this.size = random(3, 8);
+    this.size = random(1.5, 4);
     this.colour = random(colors);
+    this.twinkle = random(1000);
   }
 
   update() {
-    this.x += this.vx;
-    this.y += this.vy;
+    this.angle += this.speed;
 
-    let dx = this.x - centerX;
-    let dy = this.y - centerY;
-    let distance = sqrt(dx * dx + dy * dy);
+    this.x = this.homeX +
+      cos(this.angle) * this.moveAmount;
 
-    if (distance + this.size / 2 >= radius) {
-      let nx = dx / distance;
-      let ny = dy / distance;
-
-      let dot = this.vx * nx + this.vy * ny;
-
-      if (dot > 0) {
-        this.vx -= 2 * dot * nx;
-        this.vy -= 2 * dot * ny;
-      }
-
-      this.x = centerX + nx * (radius - this.size / 2);
-      this.y = centerY + ny * (radius - this.size / 2);
-    }
+    this.y = this.homeY +
+      sin(this.angle) * this.moveAmount;
   }
 
   show() {
+    let glow = map(
+      sin(frameCount * 0.08 + this.twinkle),
+      -1,
+      1,
+      80,
+      255
+    );
+
+    drawingContext.shadowBlur = 10;
+
+    drawingContext.shadowColor =
+      `rgb(${this.colour[0]}, ${this.colour[1]}, ${this.colour[2]})`;
+
     noStroke();
 
     fill(
       this.colour[0],
       this.colour[1],
-      this.colour[2]
+      this.colour[2],
+      glow
     );
 
     circle(this.x, this.y, this.size);
+
+    if (glow > 220) {
+      fill(255, 255, 255, glow);
+      circle(this.x, this.y, this.size * 0.3);
+    }
+
+    drawingContext.shadowBlur = 0;
   }
 }
